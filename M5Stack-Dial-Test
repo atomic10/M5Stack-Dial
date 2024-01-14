@@ -1,0 +1,470 @@
+esphome:
+  name: workshop-rotary-test
+  friendly_name: workshop-rotary-test
+  on_boot:
+    priority: 100
+    then:
+     - logger.log: "Startup - Backlight on"
+     - lambda: |-
+          id(oledbacklight).set_level(0.7);       
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: ENCYPTION_KEY
+
+ota:
+  password: OTA_PASSWORD
+
+globals:
+  - id: screenwidth
+    type: int
+    restore_value: no
+  - id: max_rotary_value
+    type: int
+    restore_value: no
+    initial_value: '1'
+  - id: min_rotary_value
+    type: int
+    restore_value: no
+    initial_value: '100'
+
+external_components:
+  - source: github://dgaust/esphome@gc9a01
+    components: [ gc9a01, ft3267 ]
+    refresh: 0s
+
+i2c:
+  - id: bus_internal
+    sda: GPIO11
+    scl: GPIO12
+#  - id: bus_porta
+#    sda: GPIO13
+#    scl: GPIO15
+#  interrupt: 14
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: DEBUG
+
+color:
+  - id: my_red
+    red: 100%
+    green: 3%
+    blue: 5%
+  - id: my_green
+    hex: 4CBB17
+  - id: my_blue
+    red: 3%
+    green: 5%
+    blue: 100%
+  - id: my_yellow
+    hex: FFFF00 
+  - id: my_light_blue
+    hex: 145DA0
+  - id: my_light_red
+    hex: fc6d6d
+  - id: my_light_orange
+    hex: FD7F20
+  - id: my_light_yellow
+    hex: B58B00
+
+image:
+  - file: mdi:volume-variant-off
+    id: volume_mute
+    resize: 40x40
+  - file: mdi:volume-low
+    id: volume_notmute
+    resize: 40x40
+  - file: mdi:fan
+    id: fan_40
+    resize: 40x40
+  - file: mdi:weather-tornado
+    id:  cyclone_icon_40
+    resize: 40x40
+  - file: mdi:weather-tornado
+    id: cyclone_icon_80
+    resize: 80x80
+  - file: mdi:fan
+    id: fan_80
+    resize: 80x80
+  - file: mdi:knob
+    id: volumeknob
+    resize: 80x80
+  - file: mdi:volume-low
+    id: volume_notmute_80
+    resize: 80x80
+  - file: mdi:volume-variant-off
+    id: volume_mute_80
+    resize: 80x80
+
+font:
+  - file: "fonts/arial.ttf"
+    id: my_font
+    size: 40
+  
+  - file: "gfonts://Roboto"
+    id: roboto16
+    size: 16
+
+  - file: "gfonts://Roboto"
+    id: roboto20
+    size: 20
+  
+  - file: "gfonts://Roboto"
+    id: roboto24
+    size: 24
+
+  - file: "gfonts://Roboto"
+    id: roboto40
+    size: 40
+
+wifi:
+  ssid: WIFI_SSID
+  password: WIFI_PASSWORD
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: FALLBACK_HS
+    password: FALLBACK_HS_PASSWORD
+
+captive_portal:
+  
+rc522_i2c:
+  i2c_id:  bus_internal
+  address: 0x28
+  on_tag:
+    then:
+      - rtttl.play: "success:d=24,o=5,b=100:c,g,b"
+      - homeassistant.tag_scanned: !lambda 'return x;'
+
+
+touchscreen:
+  platform: ft3267
+
+spi:
+  mosi_pin: GPIO5
+  clk_pin: GPIO6
+
+display:
+- platform: gc9a01
+  reset_pin: GPIO8
+  id: my_lcd
+  cs_pin: GPIO7
+  dc_pin: GPIO4
+  rotation: 90
+  pages:
+    - id: page1
+      lambda: |-
+        float screenheight = it.get_height();
+        float screenwidth = it.get_width();
+        float halfscreenheight = screenheight / 2;
+        float halfscreenwidth = screenwidth /2;
+        it.filled_rectangle(0, 0, halfscreenwidth, halfscreenheight, my_light_orange);
+        it.filled_rectangle(halfscreenwidth, halfscreenheight, 155, 155, my_blue);
+        it.filled_rectangle(0, halfscreenheight, halfscreenwidth, 155, my_green);      
+        it.filled_rectangle(halfscreenwidth, 0, 155, halfscreenheight, my_red);      
+        it.filled_rectangle(halfscreenwidth, halfscreenheight, - 155, - 155, my_green);      
+        it.line(0, halfscreenheight, screenwidth, halfscreenheight);
+        it.line(halfscreenwidth, 0, halfscreenwidth, screenheight);
+        it.image(halfscreenwidth - 50, halfscreenheight - 90, fan_80, ImageAlign::TOP_CENTER);
+        it.image(halfscreenwidth + 50, halfscreenheight + 10, cyclone_icon_80, ImageAlign::TOP_CENTER);
+        it.image(halfscreenwidth + 50, halfscreenheight - 90, volume_notmute_80, ImageAlign::TOP_CENTER);
+        it.image(halfscreenwidth - 50, halfscreenheight + 10, volumeknob, ImageAlign::TOP_CENTER);
+  
+
+
+    - id: page2
+      lambda: |-
+        float screenheight = it.get_height();
+        float screenwidth = it.get_width();
+        float halfscreenheight = screenheight / 2;
+        float halfscreenwidth = screenwidth /2;
+        it.image(halfscreenwidth, halfscreenheight - 55, fan_80, ImageAlign::TOP_CENTER);
+        it.start_clipping(0, (id(vent_fan_speed).state * -1) + 155, 250, 250);
+        it.filled_circle(halfscreenwidth, screenheight, 255, my_blue);
+        it.end_clipping();
+        it.printf(halfscreenwidth, halfscreenheight + 35, id(roboto40), TextAlign::TOP_CENTER, "%.0f%%", id(vent_fan_speed).state); 
+        it.circle(halfscreenwidth -12, 225, 3);
+        it.filled_circle(halfscreenwidth, 225, 3);
+        it.circle(halfscreenwidth +12, 225, 3);
+
+
+    - id: page3
+      lambda: |-
+        float screenheight = it.get_height();
+        float screenwidth = it.get_width();
+        float halfscreenheight = screenheight / 2;
+        float halfscreenwidth = screenwidth /2;
+        it.image(halfscreenwidth, halfscreenheight - 55, cyclone_icon_80, ImageAlign::TOP_CENTER);
+        it.printf(halfscreenwidth, halfscreenheight + 35, id(roboto24), TextAlign::TOP_CENTER, "%.0f%%", id(vent_fan_speed).state); 
+        it.circle(halfscreenwidth -12, 225, 3);
+        it.circle(halfscreenwidth, 225, 3);
+        it.filled_circle(halfscreenwidth +12, 225, 3);
+ 
+  on_page_change:
+      - to: page1
+        then:
+          - sensor.rotary_encoder.set_value:
+              id: rotaryencoder
+              value: !lambda 'return id(beam_volume).state * 100;'
+          - component.update: my_lcd
+      - to: page2
+        then:
+          - sensor.rotary_encoder.set_value:
+              id: rotaryencoder
+              value: !lambda 'return id(vent_fan_speed).state;'
+          - component.update: my_lcd
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO42
+    name: "BacklightButton"
+    on_press:
+        - if:
+            condition:
+              - display.is_displaying_page: page1
+            then:
+              if:
+                condition:
+                  lambda: return id(mediaplayermute).state == "off";
+                then:
+                  - logger.log: 
+                      format: "The mediaplayer sensor reports value %s"
+                      args: [ 'id(mediaplayermute).state' ]
+                  - homeassistant.service:
+                     service: media_player.volume_mute
+                     data:
+                      entity_id: media_player.workshop
+                      is_volume_muted: 'true'
+                else:
+                  - logger.log: 
+                      format: "The mediaplayer sensor reports value %s"
+                      args: [ 'id(mediaplayermute).state' ]
+                  - homeassistant.service:
+                     service: media_player.volume_mute
+                     data:
+                      entity_id: media_player.workshop
+                      is_volume_muted: 'false'
+                      
+  - platform: touchscreen
+    name: Top Left Touch Quadrant
+    x_min: 0
+    x_max: 119
+    y_min: 0
+    y_max: 119
+    on_state:
+      then:
+        - if:
+            condition:
+              - display.is_displaying_page: page1
+            then:
+              - display.page.show: page2     
+        - if:
+            condition:
+             or: 
+               - display.is_displaying_page: page2
+               - display.is_displaying_page: page3
+            then:
+              - display.page.show: page1
+              - component.update: my_lcd
+
+  - platform: touchscreen
+    name: Top Right Touch Quadrant
+    x_min: 120
+    x_max: 240
+    y_min: 0
+    y_max: 119
+    on_state:
+      then:
+        - if:
+            condition:
+              - display.is_displaying_page: page1
+            then:
+              - display.page.show: page3   
+        - if:
+            condition:
+             or: 
+               - display.is_displaying_page: page2
+               - display.is_displaying_page: page3
+            then:
+               - display.page.show: page2
+               - component.update: my_lcd
+
+  - platform: touchscreen
+    name: Bottom Left Touch Quadrant
+    x_min: 0
+    x_max: 119
+    y_min: 120
+    y_max: 240
+    on_state:
+      then:
+         - display.page.show_next: my_lcd
+         - component.update: my_lcd
+
+  - platform: touchscreen
+    name: Bottom Right Touch Quadrant
+    x_min: 120
+    x_max: 240
+    y_min: 120
+    y_max: 240
+    on_state:
+      then:
+         - display.page.show_previous: my_lcd
+         - component.update: my_lcd
+
+  - platform: homeassistant
+    name: "keypad6"
+    id: "fan_button"
+    entity_id: binary_sensor.keypadkey_6
+    on_state:
+      then:
+        - display.page.show: page2
+        - component.update: my_lcd
+  - platform: homeassistant
+    name: "keypad9"
+    id: "dusty_button"
+    entity_id: binary_sensor.keypadkey_9
+    on_state:
+       then:
+          - display.page.show: page3
+          - component.update: my_lcd
+
+sensor:
+  - platform: rotary_encoder
+    name: "Rotary Encoder"
+    id: rotaryencoder
+    pin_a: 
+      number: GPIO40
+      mode:
+       input: true
+       pullup: true
+    pin_b: 
+      number: GPIO41
+      mode:
+       input: true
+       pullup: true
+    accuracy_decimals: 1
+    on_clockwise: 
+      - rtttl.play: quick_e:d=4,o=5,b=100:16e6      
+      - if:
+          condition:
+            - display.is_displaying_page: page1
+          then:
+            - homeassistant.service:
+                service: media_player.volume_up
+                data:
+                  entity_id: media_player.workshop
+            - component.update: my_lcd
+      - if:
+          condition:
+            - display.is_displaying_page: page2
+          then:
+            - homeassistant.service:
+                service: input_number.increment
+                data:
+                  entity_id: input_number.vent_fan_speed
+            - component.update: my_lcd
+      - if:
+          condition:
+            - display.is_displaying_page: page3
+          then:
+            - homeassistant.service:
+                service: input_number.increment
+                data:
+                  entity_id: input_number.vent_fan_speed
+            - component.update: my_lcd
+    on_anticlockwise:
+      - if:
+          condition:
+            - display.is_displaying_page: page1
+          then:
+            - homeassistant.service:
+                service: media_player.volume_down
+                data:
+                  entity_id: media_player.workshop
+            - component.update: my_lcd      
+      - if:
+          condition:
+            - display.is_displaying_page: page2
+          then:
+            - homeassistant.service:
+                service: input_number.decrement
+                data:
+                  entity_id: input_number.vent_fan_speed
+            - component.update: my_lcd
+      - if:
+          condition:
+            - display.is_displaying_page: page3
+          then:
+            - homeassistant.service:
+                service: input_number.decrement
+                data:
+                  entity_id: input_number.vent_fan_speed
+            - component.update: my_lcd
+  
+  - platform: homeassistant
+    name: "Media Volume"
+    id: "beam_volume"
+    entity_id: media_player.workshop
+    attribute: volume_level
+
+  - platform: homeassistant
+    name: "Vent Fan Speed"
+    id: vent_fan_speed
+    entity_id: input_number.vent_fan_speed
+    on_value:
+      - component.update: my_lcd
+
+light:
+  - platform: monochromatic
+    id: backlight
+    name: "Backlight"
+    output: oledbacklight
+    default_transition_length: 250ms
+
+output:
+  - id: oledbacklight
+    platform: ledc
+    pin: GPIO9
+    #pin: GPIO21
+    max_power: 1
+    min_power: 0
+    
+  - platform: ledc
+    id: buzzer_out
+    pin:
+      number: GPIO3
+
+# Enable ringtone music support
+rtttl:
+  id: buzzer
+  output: buzzer_out
+
+text_sensor:
+  - platform: homeassistant
+    name: "Media Player Mute"
+    id: "mediaplayermute"
+    entity_id: media_player.workshop
+    attribute: is_volume_muted
+    on_value:
+      then:
+        - component.update: my_lcd
+  - platform: homeassistant
+    name: "Vent Fan Status"
+    id: vent_fan
+    entity_id: switch.vent_fan
+    on_value:
+      - component.update: my_lcd
+
+
+
+
+
+
+    
