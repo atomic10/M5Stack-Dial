@@ -104,7 +104,7 @@ image:
     resize: 80x80
 
 font:
-  - file: "fonts/arial.ttf"
+  - file: "gfonts://Lato"
     id: my_font
     size: 40
   
